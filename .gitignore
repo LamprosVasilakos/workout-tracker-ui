@@ -17,6 +17,7 @@ dist-ssr
 !.vscode/extensions.json
 .github/
 .agents/
+.cursor/
 
 .idea
 .DS_Store
