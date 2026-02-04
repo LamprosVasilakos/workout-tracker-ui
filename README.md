@@ -1,1 +1,1 @@
-Workout Tracker Application
+Workout Tracker App
