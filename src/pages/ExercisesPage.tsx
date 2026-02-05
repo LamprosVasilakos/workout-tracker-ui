@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,9 +10,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import CreateExerciseModal from "@/components/CreateExerciseModal";
 import { mockExercises } from "@/services/mockData";
-import type { MuscleGroup } from "@/schemas/exercise";
+import type { MuscleGroup, Exercise } from "@/schemas/exercise";
 
 const muscleGroups: { value: MuscleGroup; label: string }[] = [
   { value: "chest", label: "Chest" },
@@ -21,18 +21,38 @@ const muscleGroups: { value: MuscleGroup; label: string }[] = [
   { value: "biceps", label: "Biceps" },
   { value: "triceps", label: "Triceps" },
   { value: "legs", label: "Legs" },
-  { value: "abs", label: "Abs" },
-  { value: "cardio", label: "Cardio" },
+  { value: "core", label: "Core" },
+  { value: "other", label: "Other" },
 ];
 
 function ExercisesPage() {
   const navigate = useNavigate();
   const [selectedMuscleGroup, setSelectedMuscleGroup] =
     useState<MuscleGroup>("chest");
+  const [exercises, setExercises] = useState<Exercise[]>(mockExercises);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const filteredExercises = mockExercises.filter(
+  const filteredExercises = exercises.filter(
     (exercise) => exercise.muscleGroup === selectedMuscleGroup,
   );
+
+  const handleCreateExercise = (newExercise: Omit<Exercise, "id">) => {
+    const exercise: Exercise = {
+      ...newExercise,
+      id: crypto.randomUUID(),
+    };
+    setExercises((prev) => [...prev, exercise]);
+  };
+
+  const handleDeleteExercise = (exerciseId: string) => {
+    if (
+      confirm(
+        "Are you sure you want to delete this exercise? This action cannot be undone.",
+      )
+    ) {
+      setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
+    }
+  };
 
   const handleAddExercise = (exerciseId: string) => {
     console.log("Adding exercise:", exerciseId);
@@ -53,16 +73,22 @@ function ExercisesPage() {
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-bold">Exercise Library</h1>
               <p className="text-sm text-muted-foreground">
                 Choose exercises to add to your workout
               </p>
             </div>
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Exercise
+            </Button>
           </div>
         </div>
       </header>
-
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
         <Tabs
@@ -72,7 +98,7 @@ function ExercisesPage() {
           }
         >
           {/* Muscle Group Tabs */}
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 mb-6">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-y-2 mb-6 !h-auto">
             {muscleGroups.map((group) => (
               <TabsTrigger key={group.value} value={group.value}>
                 {group.label}
@@ -82,44 +108,32 @@ function ExercisesPage() {
 
           {/* Exercise Cards */}
           {muscleGroups.map((group) => (
-            <TabsContent key={group.value} value={group.value}>
+            <TabsContent key={group.value} value={group.value} className="mt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredExercises.map((exercise) => (
                   <Card
                     key={exercise.id}
-                    className="hover:shadow-md transition-all cursor-pointer"
+                    className="hover:shadow-md transition-all cursor-pointer group"
                     onClick={() => handleAddExercise(exercise.id)}
                   >
                     <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1 flex-1">
-                          <CardTitle className="text-lg">
-                            {exercise.name}
-                          </CardTitle>
-                          <Badge variant="secondary" className="text-xs">
-                            {group.label}
-                          </Badge>
-                        </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-lg flex-1">
+                          {exercise.name}
+                        </CardTitle>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="shrink-0 h-8 w-8 p-0"
+                          className="h-8 w-8 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAddExercise(exercise.id);
+                            handleDeleteExercise(exercise.id);
                           }}
                         >
-                          <Plus className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
                     </CardHeader>
-                    {exercise.description && (
-                      <CardContent>
-                        <CardDescription className="text-sm">
-                          {exercise.description}
-                        </CardDescription>
-                      </CardContent>
-                    )}
                   </Card>
                 ))}
               </div>
@@ -135,6 +149,12 @@ function ExercisesPage() {
           ))}
         </Tabs>
       </main>
+      {/* Create Exercise Modal */}
+      <CreateExerciseModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        onCreateExercise={handleCreateExercise}
+      />{" "}
     </div>
   );
 }
