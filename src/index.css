@@ -46,7 +46,6 @@
 
 :root {
   --radius: 0.5rem;
-  /* Light mode - Fitness Blue theme from design system */
   --background: oklch(0.98 0.01 240); /* #EFF6FF - blue-50 */
   --foreground: oklch(0.35 0.12 260); /* #1E40AF - blue-800 */
   --card: oklch(1 0 0); /* white */
@@ -119,7 +118,7 @@
     @apply border-border outline-ring/50;
   }
   html {
-    font-size: 18px;
+    font-size: 16px;
     height: 100%;
     overflow: hidden;
   }
