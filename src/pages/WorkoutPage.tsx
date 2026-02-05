@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { Plus, LogOut, Dumbbell } from "lucide-react";
@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import WorkoutCalendar from "@/components/WorkoutCalendar";
 import ExerciseCard from "@/components/ExerciseCard";
-import type { Workout, ExerciseSet } from "@/schemas/workout";
+import AddExerciseModal from "@/components/AddExerciseModal";
+import type { Workout, ExerciseSet, WorkoutExercise } from "@/schemas/workout";
 
 // Mock workout data
 const mockWorkouts: Workout[] = [
@@ -19,6 +20,7 @@ const mockWorkouts: Workout[] = [
         id: "we1",
         exerciseId: "1",
         exerciseName: "Bench Press",
+        muscleGroup: "chest",
         order: 1,
         sets: [
           {
@@ -43,6 +45,7 @@ const mockWorkouts: Workout[] = [
         id: "we2",
         exerciseId: "2",
         exerciseName: "Incline Dumbbell Press",
+        muscleGroup: "chest",
         order: 2,
         sets: [
           { setNumber: 1, weight: 25, reps: 12, setType: "normal" },
@@ -68,6 +71,7 @@ const mockWorkouts: Workout[] = [
         id: "we3",
         exerciseId: "5",
         exerciseName: "Deadlift",
+        muscleGroup: "back",
         order: 1,
         sets: [
           { setNumber: 1, weight: 100, reps: 8, setType: "normal" },
@@ -97,6 +101,25 @@ function WorkoutPage() {
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(
     null,
   );
+  const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Track scroll position to show/hide separator
+  useEffect(() => {
+    const scrollElement = scrollAreaRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement;
+
+    if (!scrollElement) return;
+
+    const handleScroll = () => {
+      setIsScrolled(scrollElement.scrollTop > 10);
+    };
+
+    scrollElement.addEventListener("scroll", handleScroll);
+    return () => scrollElement.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Get workout dates for calendar highlighting
   const workoutDates = useMemo(() => workouts.map((w) => w.date), [workouts]);
@@ -123,6 +146,46 @@ function WorkoutPage() {
         return workout;
       }),
     );
+  };
+
+  const handleAddExercise = (newExercise: WorkoutExercise) => {
+    if (!selectedDate) return;
+
+    const dateString = format(selectedDate, "yyyy-MM-dd");
+    const existingWorkout = workouts.find((w) => w.date === dateString);
+
+    if (existingWorkout) {
+      // Add to existing workout
+      setWorkouts((prev) =>
+        prev.map((workout) => {
+          if (workout.id === existingWorkout.id) {
+            const maxOrder = Math.max(
+              0,
+              ...workout.exercises.map((e) => e.order),
+            );
+            return {
+              ...workout,
+              exercises: [
+                ...workout.exercises,
+                { ...newExercise, order: maxOrder + 1 },
+              ],
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return workout;
+        }),
+      );
+    } else {
+      // Create new workout
+      const newWorkout: Workout = {
+        id: `w-${Date.now()}`,
+        date: dateString,
+        exercises: [{ ...newExercise, order: 1 }],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setWorkouts((prev) => [...prev, newWorkout]);
+    }
   };
 
   const handleUpdateSet = (
@@ -210,33 +273,47 @@ function WorkoutPage() {
           </div>
 
           {/* Right Column - Workout Exercises */}
-          <div className="lg:col-span-7 h-full">
-            <Card className="p-6 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <div>
-                  <h2 className="text-3xl font-bold">
-                    {selectedDate
-                      ? format(selectedDate, "EEEE, MMMM d, yyyy")
-                      : "Select a date"}
-                  </h2>
+          <div className="lg:col-span-7 h-full flex flex-col min-h-0">
+            <Card className="h-full flex flex-col overflow-hidden">
+              {/* Header - Sticky */}
+              <div className="px-6 pt-6 pb-3 shrink-0 bg-card z-10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-3xl font-bold">
+                      {selectedDate
+                        ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                        : "Select a date"}
+                    </h2>
+                    {selectedWorkout && (
+                      <p className="text-base text-muted-foreground mt-1">
+                        {selectedWorkout.exercises.length} exercise
+                        {selectedWorkout.exercises.length !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
                   {selectedWorkout && (
-                    <p className="text-base text-muted-foreground mt-1">
-                      {selectedWorkout.exercises.length} exercise
-                      {selectedWorkout.exercises.length !== 1 ? "s" : ""}
-                    </p>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => setIsAddExerciseModalOpen(true)}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Exercise
+                    </Button>
                   )}
                 </div>
-                {selectedWorkout && (
-                  <Button variant="outline" className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Exercise
-                  </Button>
-                )}
               </div>
 
+              {/* Separator - Visible only when scrolled */}
+              <div
+                className={`border-b border-border transition-opacity duration-200 ${
+                  isScrolled ? "opacity-100" : "opacity-0"
+                }`}
+              />
+
               {/* Exercises List - Scrollable */}
-              <ScrollArea className="h-[calc(100vh-280px)] w-full">
-                <div className="pr-4">
+              <ScrollArea ref={scrollAreaRef} className="flex-1 min-h-0">
+                <div className="px-6 pb-6 pt-3">
                   {selectedWorkout ? (
                     <div className="space-y-4">
                       {selectedWorkout.exercises.map((exercise) => (
@@ -264,7 +341,10 @@ function WorkoutPage() {
                       <p className="text-sm text-muted-foreground mb-4">
                         Start tracking your exercises for this day
                       </p>
-                      <Button className="gap-2">
+                      <Button
+                        className="gap-2"
+                        onClick={() => setIsAddExerciseModalOpen(true)}
+                      >
                         <Plus className="w-4 h-4" />
                         Create Workout
                       </Button>
@@ -276,6 +356,13 @@ function WorkoutPage() {
           </div>
         </div>
       </main>
+
+      {/* Add Exercise Modal */}
+      <AddExerciseModal
+        open={isAddExerciseModalOpen}
+        onOpenChange={setIsAddExerciseModalOpen}
+        onAddExercise={handleAddExercise}
+      />
     </div>
   );
 }
