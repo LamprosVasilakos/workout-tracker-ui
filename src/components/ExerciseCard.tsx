@@ -86,6 +86,9 @@ function ExerciseCard({
           <div className="flex items-center gap-2">
             <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
             <CardTitle className="text-xl">{exercise.exerciseName}</CardTitle>
+            <Badge variant="secondary" className="capitalize">
+              {exercise.muscleGroup}
+            </Badge>
           </div>
           {isEditing && onDelete && (
             <Button
@@ -95,9 +98,9 @@ function ExerciseCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="text-muted-foreground hover:text-destructive"
+              className="h-8 w-8 p-0"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-4 h-4 text-destructive" />
             </Button>
           )}
         </div>
