@@ -7,15 +7,14 @@ export const muscleGroupSchema = z.enum([
   "biceps",
   "triceps",
   "legs",
-  "abs",
-  "cardio",
+  "core",
+  "other",
 ]);
 
 export const exerciseSchema = z.object({
   id: z.string(),
   name: z.string(),
   muscleGroup: muscleGroupSchema,
-  description: z.string().optional(),
 });
 
 // TypeScript types

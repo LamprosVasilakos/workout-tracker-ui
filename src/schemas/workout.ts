@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { muscleGroupSchema } from "./exercise";
 
 export const setTypeSchema = z.enum(["normal", "warmup", "dropset", "failure"]);
 
@@ -14,6 +15,7 @@ export const workoutExerciseSchema = z.object({
   id: z.string(),
   exerciseId: z.string(),
   exerciseName: z.string(),
+  muscleGroup: muscleGroupSchema,
   sets: z.array(exerciseSetSchema),
   order: z.number(),
 });
