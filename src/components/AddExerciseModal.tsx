@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,54 +8,43 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+} from "@/components/ui/dialog.tsx";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { mockExercises } from "@/services/mockData";
-import type { Exercise, MuscleGroup } from "@/schemas/exercise";
-import type { WorkoutExercise } from "@/schemas/workout";
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { exerciseService } from "@/services/exerciseService.ts";
+import type { Exercise, MuscleGroup } from "@/schemas/exercise.ts";
+import type { SetType } from "@/schemas/workout.ts";
 
 const muscleGroupOptions: { value: MuscleGroup; label: string }[] = [
-  { value: "chest", label: "Chest" },
-  { value: "back", label: "Back" },
-  { value: "shoulders", label: "Shoulders" },
-  { value: "biceps", label: "Biceps" },
-  { value: "triceps", label: "Triceps" },
-  { value: "legs", label: "Legs" },
-  { value: "core", label: "Core" },
-  { value: "other", label: "Other" },
+  { value: "CHEST", label: "Chest" },
+  { value: "BACK", label: "Back" },
+  { value: "SHOULDERS", label: "Shoulders" },
+  { value: "BICEPS", label: "Biceps" },
+  { value: "TRICEPS", label: "Triceps" },
+  { value: "LEGS", label: "Legs" },
+  { value: "CORE", label: "Core" },
+  { value: "OTHER", label: "Other" },
 ];
 
-const setTypeOptions = [
-  { value: "normal", label: "Normal" },
-  { value: "warmup", label: "Warmup" },
-  { value: "dropset", label: "Dropset" },
-  { value: "failure", label: "Failure" },
-];
-
-const addExerciseFormSchema = z.object({
-  weight: z.number().min(0, "Weight must be 0 or greater"),
-  reps: z.number().min(1, "Reps must be at least 1"),
-  setType: z.enum(["normal", "warmup", "dropset", "failure"]),
-});
-
-type AddExerciseFormData = z.infer<typeof addExerciseFormSchema>;
+interface SetConfig {
+  reps: number;
+  weight: number;
+  setType: SetType;
+  notes: string;
+}
 
 interface AddExerciseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddExercise: (exercise: WorkoutExercise) => void;
+  onAddExercise: (exerciseId: string, sets: SetConfig[]) => void;
 }
 
 function AddExerciseModal({
@@ -64,61 +52,89 @@ function AddExerciseModal({
   onOpenChange,
   onAddExercise,
 }: AddExerciseModalProps) {
+  const [selectedMuscleGroup, setSelectedMuscleGroup] =
+    useState<MuscleGroup>("CHEST");
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null,
   );
+  const [sets, setSets] = useState<SetConfig[]>([
+    { reps: 10, weight: 0, setType: "WORKING", notes: "" },
+  ]);
 
-  const form = useForm<AddExerciseFormData>({
-    resolver: zodResolver(addExerciseFormSchema),
-    defaultValues: {
-      weight: 20,
-      reps: 10,
-      setType: "normal",
-    },
+  // Fetch exercises for the selected muscle group
+  const { data: exercises = [] } = useQuery({
+    queryKey: ["exercises", selectedMuscleGroup],
+    queryFn: () =>
+      exerciseService.getExercisesByMuscleGroup(selectedMuscleGroup),
+    enabled: open,
   });
 
-  // Group exercises by muscle group
-  const exercisesByMuscleGroup = mockExercises.reduce(
-    (acc, exercise) => {
-      if (!acc[exercise.muscleGroup]) {
-        acc[exercise.muscleGroup] = [];
+  const handleSelectExercise = (exercise: Exercise) => {
+    setSelectedExercise(exercise);
+  };
+
+  const handleAddSet = () => {
+    const lastSet = sets[sets.length - 1];
+    setSets([
+      ...sets,
+      {
+        reps: lastSet?.reps || 10,
+        weight: lastSet?.weight || 0,
+        setType: lastSet?.setType || "WORKING",
+        notes: "",
+      },
+    ]);
+  };
+
+  const handleRemoveSet = (index: number) => {
+    if (sets.length > 1) {
+      setSets(sets.filter((_, idx) => idx !== index));
+    }
+  };
+
+  const handleSetChange = (
+    index: number,
+    field: keyof SetConfig,
+    value: string | number,
+  ) => {
+    setSets((prevSets) => {
+      const newSets = [...prevSets];
+      const currentSet = { ...newSets[index] };
+
+      if (field === "weight" || field === "reps") {
+        if (value === "" || value === null || value === undefined) {
+          currentSet[field] = 0;
+        } else {
+          const numValue = Number(value);
+          if (!isNaN(numValue) && numValue >= 0) {
+            currentSet[field] = numValue;
+          }
+        }
+      } else if (field === "setType") {
+        currentSet.setType = value as SetType;
+      } else if (field === "notes") {
+        currentSet.notes = value as string;
       }
-      acc[exercise.muscleGroup].push(exercise);
-      return acc;
-    },
-    {} as Record<string, Exercise[]>,
-  );
 
-  const muscleGroups = muscleGroupOptions.filter(
-    (group) => exercisesByMuscleGroup[group.value]?.length,
-  );
+      newSets[index] = currentSet;
+      return newSets;
+    });
+  };
 
-  const handleSubmit = (data: AddExerciseFormData) => {
-    if (!selectedExercise) return;
+  const handleConfirm = () => {
+    if (selectedExercise) {
+      onAddExercise(selectedExercise.id, sets);
+      handleClose();
+    }
+  };
 
-    const newWorkoutExercise: WorkoutExercise = {
-      id: `we-${crypto.randomUUID()}`,
-      exerciseId: selectedExercise.id,
-      exerciseName: selectedExercise.name,
-      muscleGroup: selectedExercise.muscleGroup,
-      order: 0, // Will be set by parent
-      sets: [
-        {
-          setNumber: 1,
-          weight: data.weight,
-          reps: data.reps,
-          setType: data.setType,
-        },
-      ],
-    };
-
-    onAddExercise(newWorkoutExercise);
-    handleClose();
+  const handleBack = () => {
+    setSelectedExercise(null);
   };
 
   const handleClose = () => {
     setSelectedExercise(null);
-    form.reset();
+    setSets([{ reps: 10, weight: 0, setType: "WORKING", notes: "" }]);
     onOpenChange(false);
   };
 
@@ -126,10 +142,12 @@ function AddExerciseModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl lg:max-w-3xl xl:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Add Exercise to Workout</DialogTitle>
+          <DialogTitle>
+            {selectedExercise ? "Configure Sets" : "Add Exercise to Workout"}
+          </DialogTitle>
           <DialogDescription>
             {selectedExercise
-              ? "Enter the details for your first set"
+              ? `Configure sets for ${selectedExercise.name}`
               : "Search and select an exercise to add to your workout"}
           </DialogDescription>
         </DialogHeader>
@@ -137,9 +155,15 @@ function AddExerciseModal({
         {!selectedExercise ? (
           <>
             {/* Muscle Group Tabs */}
-            <Tabs defaultValue={muscleGroups[0]?.value} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-1 mb-3 !h-auto p-1 [&>*:nth-child(7)]:md:col-start-3 [&>*:nth-child(7)]:xl:col-auto">
-                {muscleGroups.map((group) => (
+            <Tabs
+              value={selectedMuscleGroup}
+              onValueChange={(value) =>
+                setSelectedMuscleGroup(value as MuscleGroup)
+              }
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-1 mb-3 h-auto p-1 [&>*:nth-child(7)]:md:col-start-3 [&>*:nth-child(7)]:xl:col-auto">
+                {muscleGroupOptions.map((group) => (
                   <TabsTrigger
                     key={group.value}
                     value={group.value}
@@ -150,134 +174,170 @@ function AddExerciseModal({
                 ))}
               </TabsList>
 
-              {muscleGroups.map((muscleGroup) => (
+              {muscleGroupOptions.map((muscleGroup) => (
                 <TabsContent
                   key={muscleGroup.value}
                   value={muscleGroup.value}
                   className="mt-2"
                 >
-                  <ScrollArea className="h-100 pr-2 [&_[data-slot=scroll-area-scrollbar]]:hidden">
+                  <ScrollArea className="h-96 pr-2">
                     <div className="space-y-2">
-                      {exercisesByMuscleGroup[muscleGroup.value].map(
-                        (exercise) => (
-                          <button
-                            key={exercise.id}
-                            onClick={() => setSelectedExercise(exercise)}
-                            className="w-full text-left p-3 rounded-lg border hover:bg-muted transition-colors"
-                          >
-                            <div>
-                              <h4 className="font-medium">{exercise.name}</h4>
-                            </div>
-                          </button>
-                        ),
+                      {exercises.map((exercise) => (
+                        <button
+                          key={exercise.id}
+                          onClick={() => handleSelectExercise(exercise)}
+                          className="w-full text-left p-3 rounded-lg border hover:bg-muted transition-colors"
+                        >
+                          <div>
+                            <h4 className="font-medium">{exercise.name}</h4>
+                          </div>
+                        </button>
+                      ))}
+                      {exercises.length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No exercises found for this muscle group
+                        </div>
                       )}
                     </div>
                   </ScrollArea>
                 </TabsContent>
               ))}
             </Tabs>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+            </DialogFooter>
           </>
         ) : (
           <>
-            {/* Selected Exercise Details */}
-            <div className="p-4 rounded-lg bg-muted">
-              <div>
-                <h3 className="font-semibold text-lg">
-                  {selectedExercise.name}
-                </h3>
-              </div>
-            </div>
-
-            {/* First Set Form */}
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(handleSubmit)}
-                className="space-y-4"
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="weight"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Weight (kg)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.5"
-                            placeholder="20"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(Number(e.target.value))
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="reps"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reps</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="10"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(Number(e.target.value))
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="setType"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel>Set Type</FormLabel>
-                        <FormControl>
-                          <Select {...field}>
-                            {setTypeOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setSelectedExercise(null)}
+            {/* Set Configuration */}
+            <ScrollArea className="h-96 pr-4">
+              <div className="space-y-4">
+                {sets.map((set, index) => (
+                  <div
+                    key={index}
+                    className="p-4 border rounded-lg bg-card shadow-sm space-y-4"
                   >
-                    Back
-                  </Button>
-                  <Button type="submit">Add Exercise</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </>
-        )}
+                    <div className="flex items-center justify-between">
+                      <Label className="font-bold text-base text-primary">
+                        Set {index + 1}
+                      </Label>
+                      {sets.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSet(index)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
 
-        {!selectedExercise && (
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-          </DialogFooter>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label
+                          htmlFor={`weight-${index}`}
+                          className="text-xs font-semibold uppercase text-muted-foreground"
+                        >
+                          Weight (kg)
+                        </Label>
+                        <Input
+                          id={`weight-${index}`}
+                          type="number"
+                          value={set.weight || ""}
+                          onChange={(e) =>
+                            handleSetChange(index, "weight", e.target.value)
+                          }
+                          min="0"
+                          className="h-9 focus-visible:ring-offset-1"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label
+                          htmlFor={`reps-${index}`}
+                          className="text-xs font-semibold uppercase text-muted-foreground"
+                        >
+                          Reps
+                        </Label>
+                        <Input
+                          id={`reps-${index}`}
+                          type="number"
+                          value={set.reps || ""}
+                          onChange={(e) =>
+                            handleSetChange(index, "reps", e.target.value)
+                          }
+                          min="0"
+                          className="h-9 focus-visible:ring-offset-1"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label
+                          htmlFor={`type-${index}`}
+                          className="text-xs font-semibold uppercase text-muted-foreground"
+                        >
+                          Type
+                        </Label>
+                        <select
+                          id={`type-${index}`}
+                          value={set.setType}
+                          onChange={(e) =>
+                            handleSetChange(
+                              index,
+                              "setType",
+                              e.target.value as SetType,
+                            )
+                          }
+                          className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-shadow"
+                        >
+                          <option value="WARM_UP">Warm Up</option>
+                          <option value="WORKING">Working</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label
+                        htmlFor={`notes-${index}`}
+                        className="text-xs font-semibold uppercase text-muted-foreground"
+                      >
+                        Notes
+                      </Label>
+                      <Input
+                        id={`notes-${index}`}
+                        type="text"
+                        value={set.notes}
+                        onChange={(e) =>
+                          handleSetChange(index, "notes", e.target.value)
+                        }
+                        placeholder="Optional notes"
+                        className="h-9 focus-visible:ring-offset-1"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddSet}
+                  className="w-fit gap-1 text-xs"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add Set
+                </Button>
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={handleBack}>
+                Back
+              </Button>
+              <Button onClick={handleConfirm}>Add to Workout</Button>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 
 interface WorkoutCalendarProps {
   selectedDate: Date | undefined;

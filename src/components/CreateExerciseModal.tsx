@@ -1,6 +1,5 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -8,8 +7,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Select } from "@/components/ui/select";
+} from "@/components/ui/dialog.tsx";
+import { Select } from "@/components/ui/select.tsx";
 import {
   Form,
   FormControl,
@@ -17,34 +16,30 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { muscleGroupSchema, type MuscleGroup } from "@/schemas/exercise";
-import type { Exercise } from "@/schemas/exercise";
-
-const createExerciseFormSchema = z.object({
-  name: z.string().min(1, "Exercise name is required"),
-  muscleGroup: muscleGroupSchema,
-});
-
-type CreateExerciseFormData = z.infer<typeof createExerciseFormSchema>;
+} from "@/components/ui/form.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  createExerciseSchema,
+  type MuscleGroup,
+  type CreateExerciseInput,
+} from "@/schemas/exercise.ts";
 
 interface CreateExerciseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateExercise: (exercise: Omit<Exercise, "id">) => void;
+  onCreateExercise: (exercise: CreateExerciseInput) => void;
 }
 
 const muscleGroups: { value: MuscleGroup; label: string }[] = [
-  { value: "chest", label: "Chest" },
-  { value: "back", label: "Back" },
-  { value: "shoulders", label: "Shoulders" },
-  { value: "biceps", label: "Biceps" },
-  { value: "triceps", label: "Triceps" },
-  { value: "legs", label: "Legs" },
-  { value: "core", label: "Core" },
-  { value: "other", label: "Other" },
+  { value: "CHEST", label: "Chest" },
+  { value: "BACK", label: "Back" },
+  { value: "SHOULDERS", label: "Shoulders" },
+  { value: "BICEPS", label: "Biceps" },
+  { value: "TRICEPS", label: "Triceps" },
+  { value: "LEGS", label: "Legs" },
+  { value: "CORE", label: "Core" },
+  { value: "OTHER", label: "Other" },
 ];
 
 function CreateExerciseModal({
@@ -52,19 +47,16 @@ function CreateExerciseModal({
   onOpenChange,
   onCreateExercise,
 }: CreateExerciseModalProps) {
-  const form = useForm<CreateExerciseFormData>({
-    resolver: zodResolver(createExerciseFormSchema),
+  const form = useForm<CreateExerciseInput>({
+    resolver: zodResolver(createExerciseSchema),
     defaultValues: {
       name: "",
-      muscleGroup: "chest",
+      muscleGroup: "CHEST",
     },
   });
 
-  const handleSubmit = (data: CreateExerciseFormData) => {
-    onCreateExercise({
-      name: data.name,
-      muscleGroup: data.muscleGroup,
-    });
+  const handleSubmit = (data: CreateExerciseInput) => {
+    onCreateExercise(data);
     handleClose();
   };
 
