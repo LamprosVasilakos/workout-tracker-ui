@@ -66,7 +66,7 @@ function RegisterPage() {
               <Input
                 id="username"
                 type="text"
-                placeholder="your-username"
+                placeholder="Username"
                 {...register("username")}
               />
               {errors.username && (
@@ -82,7 +82,7 @@ function RegisterPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Password"
                   className="pr-10"
                   {...register("password")}
                 />
@@ -111,7 +111,7 @@ function RegisterPage() {
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Confirm Password"
                   className="pr-10"
                   {...register("confirmPassword")}
                 />

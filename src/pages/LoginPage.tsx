@@ -65,7 +65,7 @@ function LoginPage() {
               <Input
                 id="username"
                 type="text"
-                placeholder="your-username"
+                placeholder="Username"
                 {...register("username")}
               />
               {errors.username && (
@@ -81,7 +81,7 @@ function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Password"
                   className="pr-10"
                   {...register("password")}
                 />
