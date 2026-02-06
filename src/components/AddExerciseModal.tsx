@@ -124,7 +124,7 @@ function AddExerciseModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-xl lg:max-w-3xl xl:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Add Exercise to Workout</DialogTitle>
           <DialogDescription>
@@ -138,7 +138,7 @@ function AddExerciseModal({
           <>
             {/* Muscle Group Tabs */}
             <Tabs defaultValue={muscleGroups[0]?.value} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-y-2 mb-3 !h-auto">
+              <TabsList className="grid w-full grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-1 mb-3 !h-auto p-1 [&>*:nth-child(7)]:md:col-start-3 [&>*:nth-child(7)]:xl:col-auto">
                 {muscleGroups.map((group) => (
                   <TabsTrigger
                     key={group.value}
