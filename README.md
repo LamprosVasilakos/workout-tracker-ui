@@ -88,13 +88,9 @@ TanStack Query manages all server state with automatic caching, background refet
 
 ## Future Ideas
 
-- Add PWA support for offline access
-- Implement progress charts showing weight and volume trends
-- Create workout templates for common routines
-- Add social features to share workouts
-- Integrate exercise video demonstrations
-- Support dark mode
-- Export workout history to CSV/PDF
+- [ ] Implement progress charts showing weight and volume trends
+- [ ] Create workout templates for common routines
+- [ ] Support dark mode
 
 ## Project Structure
 
