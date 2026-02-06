@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, LogOut, Dumbbell } from "lucide-react";
+import { Plus, List, LogOut, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
@@ -238,8 +238,8 @@ function WorkoutPage() {
                 onClick={() => navigate("/exercises")}
                 className="gap-2"
               >
-                <Plus className="w-4 h-4" />
-                Add Exercise
+                <List className="w-4 h-4" />
+                Exercise List
               </Button>
               <Button variant="ghost" onClick={handleLogout} className="gap-2">
                 <LogOut className="w-4 h-4" />
