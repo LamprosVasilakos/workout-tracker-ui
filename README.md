@@ -76,6 +76,21 @@ Authentication uses JWT tokens stored in localStorage. Axios interceptors automa
 
 TanStack Query manages all server state with automatic caching, background refetching, and optimistic updates. Forms use React Hook Form with Zod schemas for validation before submission.
 
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+│   ├── ui/          # shadcn/ui base components
+│   └── ...          # Feature-specific components
+├── pages/           # Route/page components
+├── context/         # React Context providers
+├── hooks/           # Custom React hooks
+├── services/        # API service layer
+├── schemas/         # Zod schemas & TypeScript types
+└── lib/             # Utility functions
+```
+
 ## Features
 
 - Interactive calendar with workout history visualization
@@ -91,21 +106,6 @@ TanStack Query manages all server state with automatic caching, background refet
 - [ ] Implement progress charts showing weight and volume trends
 - [ ] Create workout templates for common routines
 - [ ] Support dark mode
-
-## Project Structure
-
-```
-src/
-├── components/       # Reusable UI components
-│   ├── ui/          # shadcn/ui base components
-│   └── ...          # Feature-specific components
-├── pages/           # Route/page components
-├── context/         # React Context providers
-├── hooks/           # Custom React hooks
-├── services/        # API service layer
-├── schemas/         # Zod schemas & TypeScript types
-└── lib/             # Utility functions
-```
 
 ## Author
 
