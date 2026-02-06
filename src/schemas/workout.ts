@@ -1,35 +1,59 @@
 import { z } from "zod";
-import { muscleGroupSchema } from "./exercise";
+import { type Exercise } from "./exercise.ts";
 
-export const setTypeSchema = z.enum(["normal", "warmup", "dropset", "failure"]);
+// Set Type enum - matches API
+export const setTypeSchema = z.enum(["WARM_UP", "WORKING"]);
 
-export const exerciseSetSchema = z.object({
-  setNumber: z.number().min(1),
-  weight: z.number().min(0),
-  reps: z.number().min(0),
+// API Request Schemas
+export const createSetSchema = z.object({
+  reps: z.number().min(1, "Reps must be at least 1"),
+  weight: z.number().min(0, "Weight must be at least 0"),
+  notes: z.string().max(250, "Notes must be at most 250 characters").optional(),
   setType: setTypeSchema,
-  notes: z.string().optional(),
 });
 
-export const workoutExerciseSchema = z.object({
-  id: z.string(),
+export const createWorkoutExerciseSchema = z.object({
   exerciseId: z.string(),
-  exerciseName: z.string(),
-  muscleGroup: muscleGroupSchema,
-  sets: z.array(exerciseSetSchema),
-  order: z.number(),
+  exerciseOrder: z.number().int().min(1),
+  sets: z.array(createSetSchema),
 });
 
-export const workoutSchema = z.object({
-  id: z.string(),
-  date: z.string(), // ISO date string
-  exercises: z.array(workoutExerciseSchema),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+export const createWorkoutSchema = z.object({
+  date: z.string(), // ISO 8601 date (YYYY-MM-DD)
+  workoutExercises: z.array(createWorkoutExerciseSchema),
 });
 
-// TypeScript types
+// API Response Types
+export interface SetResponse {
+  id: string;
+  reps: number;
+  weight: number;
+  notes: string | null;
+  setType: SetType;
+}
+
+export interface WorkoutExerciseResponse {
+  id: string;
+  exercise: Exercise;
+  exerciseOrder: number;
+  sets: SetResponse[];
+}
+
+export interface WorkoutResponse {
+  id: string;
+  date: string; // ISO 8601 date
+  workoutExercises: WorkoutExerciseResponse[];
+}
+
+export interface WorkoutSummaryResponse {
+  id: string;
+  date: string; // ISO 8601 date
+}
+
+// TypeScript types for forms
 export type SetType = z.infer<typeof setTypeSchema>;
-export type ExerciseSet = z.infer<typeof exerciseSetSchema>;
-export type WorkoutExercise = z.infer<typeof workoutExerciseSchema>;
-export type Workout = z.infer<typeof workoutSchema>;
+export type CreateSetInput = z.infer<typeof createSetSchema>;
+export type CreateWorkoutExerciseInput = z.infer<
+  typeof createWorkoutExerciseSchema
+>;
+export type CreateWorkoutInput = z.infer<typeof createWorkoutSchema>;
