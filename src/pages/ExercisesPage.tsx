@@ -1,47 +1,64 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.tsx";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CreateExerciseModal from "@/components/CreateExerciseModal";
-import { mockExercises } from "@/services/mockData";
-import type { MuscleGroup, Exercise } from "@/schemas/exercise";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs.tsx";
+import CreateExerciseModal from "@/components/CreateExerciseModal.tsx";
+import { exerciseService } from "@/services/exerciseService.ts";
+import type { MuscleGroup, CreateExerciseInput } from "@/schemas/exercise.ts";
 
 const muscleGroups: { value: MuscleGroup; label: string }[] = [
-  { value: "chest", label: "Chest" },
-  { value: "back", label: "Back" },
-  { value: "shoulders", label: "Shoulders" },
-  { value: "biceps", label: "Biceps" },
-  { value: "triceps", label: "Triceps" },
-  { value: "legs", label: "Legs" },
-  { value: "core", label: "Core" },
-  { value: "other", label: "Other" },
+  { value: "CHEST", label: "Chest" },
+  { value: "BACK", label: "Back" },
+  { value: "SHOULDERS", label: "Shoulders" },
+  { value: "BICEPS", label: "Biceps" },
+  { value: "TRICEPS", label: "Triceps" },
+  { value: "LEGS", label: "Legs" },
+  { value: "CORE", label: "Core" },
+  { value: "OTHER", label: "Other" },
 ];
 
 function ExercisesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selectedMuscleGroup, setSelectedMuscleGroup] =
-    useState<MuscleGroup>("chest");
-  const [exercises, setExercises] = useState<Exercise[]>(mockExercises);
+    useState<MuscleGroup>("CHEST");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const filteredExercises = exercises.filter(
-    (exercise) => exercise.muscleGroup === selectedMuscleGroup,
-  );
+  // Fetch exercises for the selected muscle group
+  const { data: exercises = [], isLoading } = useQuery({
+    queryKey: ["exercises", selectedMuscleGroup],
+    queryFn: () =>
+      exerciseService.getExercisesByMuscleGroup(selectedMuscleGroup),
+  });
 
-  const handleCreateExercise = (newExercise: Omit<Exercise, "id">) => {
-    const exercise: Exercise = {
-      ...newExercise,
-      id: crypto.randomUUID(),
-    };
-    setExercises((prev) => [...prev, exercise]);
+  // Create exercise mutation
+  const createExerciseMutation = useMutation({
+    mutationFn: (data: CreateExerciseInput) =>
+      exerciseService.createExercise(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exercises"] });
+      setIsCreateModalOpen(false);
+    },
+  });
+
+  // Delete exercise mutation
+  const deleteExerciseMutation = useMutation({
+    mutationFn: (id: string) => exerciseService.deleteExercise(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exercises"] });
+    },
+  });
+
+  const handleCreateExercise = (data: CreateExerciseInput) => {
+    createExerciseMutation.mutate(data);
   };
 
   const handleDeleteExercise = (exerciseId: string) => {
@@ -50,7 +67,7 @@ function ExercisesPage() {
         "Are you sure you want to delete this exercise? This action cannot be undone.",
       )
     ) {
-      setExercises((prev) => prev.filter((ex) => ex.id !== exerciseId));
+      deleteExerciseMutation.mutate(exerciseId);
     }
   };
 
@@ -109,41 +126,49 @@ function ExercisesPage() {
           {/* Exercise Cards */}
           {muscleGroups.map((group) => (
             <TabsContent key={group.value} value={group.value} className="mt-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredExercises.map((exercise) => (
-                  <Card
-                    key={exercise.id}
-                    className="hover:shadow-md transition-all cursor-pointer group"
-                    onClick={() => handleAddExercise(exercise.id)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-lg flex-1">
-                          {exercise.name}
-                        </CardTitle>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteExercise(exercise.id);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </div>
-
-              {filteredExercises.length === 0 && (
+              {isLoading ? (
                 <div className="text-center py-12">
-                  <p className="text-muted-foreground">
-                    No exercises found for this muscle group
-                  </p>
+                  <p className="text-muted-foreground">Loading exercises...</p>
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {exercises.map((exercise) => (
+                      <Card
+                        key={exercise.id}
+                        className="hover:shadow-md transition-all cursor-pointer group"
+                        onClick={() => handleAddExercise(exercise.id)}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-lg flex-1">
+                              {exercise.name}
+                            </CardTitle>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteExercise(exercise.id);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {exercises.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        No exercises found for this muscle group
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
           ))}
@@ -154,7 +179,7 @@ function ExercisesPage() {
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         onCreateExercise={handleCreateExercise}
-      />{" "}
+      />
     </div>
   );
 }

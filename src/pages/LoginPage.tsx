@@ -1,33 +1,47 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
 import { Dumbbell } from "lucide-react";
-import { loginSchema, type LoginInput } from "@/schemas/user";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { loginSchema, type LoginInput } from "@/schemas/user.ts";
+import { useAuth } from "@/hooks/useAuth.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/components/ui/card.tsx";
 
 function LoginPage() {
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
 
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginInput) => {
+      await login(data.username, data.password);
+    },
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.description ||
+        error.response?.data?.message ||
+        "Login failed. Please try again.";
+      setError("root", { message });
+    },
+  });
+
   const onSubmit = (data: LoginInput) => {
-    console.log("Login:", data);
-    // Mock login - in real app, call API
-    navigate("/workouts");
+    loginMutation.mutate(data);
   };
 
   return (
@@ -45,16 +59,16 @@ function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                {...register("email")}
+                id="username"
+                type="text"
+                placeholder="your-username"
+                {...register("username")}
               />
-              {errors.email && (
+              {errors.username && (
                 <p className="text-sm text-destructive">
-                  {errors.email.message}
+                  {errors.username.message}
                 </p>
               )}
             </div>
@@ -74,8 +88,19 @@ function LoginPage() {
               )}
             </div>
 
-            <Button type="submit" className="w-full" size="lg">
-              Sign In
+            {errors.root && (
+              <p className="text-sm text-destructive text-center">
+                {errors.root.message}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={loginMutation.isPending}
+            >
+              {loginMutation.isPending ? "Signing in..." : "Sign In"}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">

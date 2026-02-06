@@ -1,33 +1,47 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
 import { Dumbbell } from "lucide-react";
-import { registerSchema, type RegisterInput } from "@/schemas/user";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { registerSchema, type RegisterInput } from "@/schemas/user.ts";
+import { useAuth } from "@/hooks/useAuth.ts";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/components/ui/card.tsx";
 
 function RegisterPage() {
-  const navigate = useNavigate();
+  const { register: registerUser } = useAuth();
   const {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
   });
 
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterInput) => {
+      await registerUser(data.username, data.password);
+    },
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.description ||
+        error.response?.data?.message ||
+        "Registration failed. Please try again.";
+      setError("root", { message });
+    },
+  });
+
   const onSubmit = (data: RegisterInput) => {
-    console.log("Register:", data);
-    // Mock registration - in real app, call API
-    navigate("/workouts");
+    registerMutation.mutate(data);
   };
 
   return (
@@ -45,31 +59,16 @@ function RegisterPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="name"
+                id="username"
                 type="text"
-                placeholder="John Doe"
-                {...register("name")}
+                placeholder="your-username"
+                {...register("username")}
               />
-              {errors.name && (
+              {errors.username && (
                 <p className="text-sm text-destructive">
-                  {errors.name.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                {...register("email")}
-              />
-              {errors.email && (
-                <p className="text-sm text-destructive">
-                  {errors.email.message}
+                  {errors.username.message}
                 </p>
               )}
             </div>
@@ -104,8 +103,21 @@ function RegisterPage() {
               )}
             </div>
 
-            <Button type="submit" className="w-full" size="lg">
-              Create Account
+            {errors.root && (
+              <p className="text-sm text-destructive text-center">
+                {errors.root.message}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={registerMutation.isPending}
+            >
+              {registerMutation.isPending
+                ? "Creating account..."
+                : "Create Account"}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">

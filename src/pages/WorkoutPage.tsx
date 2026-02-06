@@ -1,109 +1,89 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, LogOut, Dumbbell } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import WorkoutCalendar from "@/components/WorkoutCalendar";
-import ExerciseCard from "@/components/ExerciseCard";
-import AddExerciseModal from "@/components/AddExerciseModal";
-import type { Workout, ExerciseSet, WorkoutExercise } from "@/schemas/workout";
-
-// Mock workout data
-const mockWorkouts: Workout[] = [
-  {
-    id: "w1",
-    date: format(new Date(), "yyyy-MM-dd"),
-    exercises: [
-      {
-        id: "we1",
-        exerciseId: "1",
-        exerciseName: "Bench Press",
-        muscleGroup: "chest",
-        order: 1,
-        sets: [
-          {
-            setNumber: 1,
-            weight: 60,
-            reps: 12,
-            setType: "warmup",
-            notes: "Easy warmup",
-          },
-          { setNumber: 2, weight: 80, reps: 10, setType: "normal" },
-          { setNumber: 3, weight: 90, reps: 8, setType: "normal" },
-          {
-            setNumber: 4,
-            weight: 95,
-            reps: 6,
-            setType: "normal",
-            notes: "Felt strong",
-          },
-        ],
-      },
-      {
-        id: "we2",
-        exerciseId: "2",
-        exerciseName: "Incline Dumbbell Press",
-        muscleGroup: "chest",
-        order: 2,
-        sets: [
-          { setNumber: 1, weight: 25, reps: 12, setType: "normal" },
-          { setNumber: 2, weight: 30, reps: 10, setType: "normal" },
-          {
-            setNumber: 3,
-            weight: 30,
-            reps: 8,
-            setType: "dropset",
-            notes: "Dropped to 20kg",
-          },
-        ],
-      },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "w2",
-    date: format(new Date(Date.now() - 86400000 * 2), "yyyy-MM-dd"), // 2 days ago
-    exercises: [
-      {
-        id: "we3",
-        exerciseId: "5",
-        exerciseName: "Deadlift",
-        muscleGroup: "back",
-        order: 1,
-        sets: [
-          { setNumber: 1, weight: 100, reps: 8, setType: "normal" },
-          { setNumber: 2, weight: 120, reps: 6, setType: "normal" },
-          { setNumber: 3, weight: 140, reps: 4, setType: "normal" },
-          {
-            setNumber: 4,
-            weight: 150,
-            reps: 2,
-            setType: "failure",
-            notes: "Failed on 3rd rep",
-          },
-        ],
-      },
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-];
+import { Button } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import WorkoutCalendar from "@/components/WorkoutCalendar.tsx";
+import ExerciseCard from "@/components/ExerciseCard.tsx";
+import AddExerciseModal from "@/components/AddExerciseModal.tsx";
+import { workoutService } from "@/services/workoutService.ts";
+import { useAuth } from "@/hooks/useAuth.ts";
+import type {
+  WorkoutExerciseResponse,
+  SetResponse,
+  CreateWorkoutInput,
+} from "@/schemas/workout.ts";
 
 function WorkoutPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { logout } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(),
   );
-  const [workouts, setWorkouts] = useState<Workout[]>(mockWorkouts);
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(
     null,
   );
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Calculate date range for the current month view
+  const dateRange = useMemo(() => {
+    if (!selectedDate) return { startDate: "", endDate: "" };
+    const start = startOfMonth(selectedDate);
+    const end = endOfMonth(selectedDate);
+    return {
+      startDate: format(start, "yyyy-MM-dd"),
+      endDate: format(end, "yyyy-MM-dd"),
+    };
+  }, [selectedDate]);
+
+  // Fetch workout summaries for calendar highlighting
+  const { data: workoutSummaries = [] } = useQuery({
+    queryKey: ["workouts", "summaries", dateRange.startDate, dateRange.endDate],
+    queryFn: () =>
+      workoutService.getWorkouts(dateRange.startDate, dateRange.endDate),
+    enabled: !!dateRange.startDate && !!dateRange.endDate,
+  });
+
+  // Fetch full workout details for selected date
+  const selectedDateString = selectedDate
+    ? format(selectedDate, "yyyy-MM-dd")
+    : "";
+  const selectedWorkoutSummary = workoutSummaries.find(
+    (w) => w.date === selectedDateString,
+  );
+
+  const { data: selectedWorkout } = useQuery({
+    queryKey: ["workouts", selectedWorkoutSummary?.id],
+    queryFn: () => workoutService.getWorkout(selectedWorkoutSummary!.id),
+    enabled: !!selectedWorkoutSummary?.id,
+  });
+
+  // Create/update workout mutation
+  const createWorkoutMutation = useMutation({
+    mutationFn: (data: CreateWorkoutInput) => {
+      if (selectedWorkout) {
+        return workoutService.updateWorkout(selectedWorkout.id, data);
+      }
+      return workoutService.createWorkout(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+    },
+  });
+
+  // Delete workout mutation
+  const deleteWorkoutMutation = useMutation({
+    mutationFn: (id: string) => workoutService.deleteWorkout(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+    },
+  });
 
   // Track scroll position to show/hide separator
   useEffect(() => {
@@ -122,107 +102,117 @@ function WorkoutPage() {
   }, []);
 
   // Get workout dates for calendar highlighting
-  const workoutDates = useMemo(() => workouts.map((w) => w.date), [workouts]);
-
-  // Get workout for selected date
-  const selectedWorkout = useMemo(() => {
-    if (!selectedDate) return null;
-    const dateString = format(selectedDate, "yyyy-MM-dd");
-    return workouts.find((w) => w.date === dateString) || null;
-  }, [selectedDate, workouts]);
+  const workoutDates = useMemo(
+    () => workoutSummaries.map((w) => w.date),
+    [workoutSummaries],
+  );
 
   const handleDeleteExercise = (exerciseId: string) => {
     if (!selectedWorkout) return;
 
-    setWorkouts((prev) =>
-      prev.map((workout) => {
-        if (workout.id === selectedWorkout.id) {
-          return {
-            ...workout,
-            exercises: workout.exercises.filter((ex) => ex.id !== exerciseId),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return workout;
-      }),
+    const updatedExercises = selectedWorkout.workoutExercises.filter(
+      (ex) => ex.id !== exerciseId,
     );
+
+    // If no exercises left, delete the workout
+    if (updatedExercises.length === 0) {
+      deleteWorkoutMutation.mutate(selectedWorkout.id);
+      return;
+    }
+
+    // Otherwise update the workout
+    const workoutData: CreateWorkoutInput = {
+      date: selectedWorkout.date,
+      workoutExercises: updatedExercises.map((ex, index) => ({
+        exerciseId: ex.exercise.id,
+        exerciseOrder: index + 1,
+        sets: ex.sets.map((set) => ({
+          reps: set.reps,
+          weight: set.weight,
+          notes: set.notes || undefined,
+          setType: set.setType,
+        })),
+      })),
+    };
+
+    createWorkoutMutation.mutate(workoutData);
   };
 
-  const handleAddExercise = (newExercise: WorkoutExercise) => {
+  const handleAddExercise = (
+    exerciseId: string,
+    sets: Array<{
+      reps: number;
+      weight: number;
+      setType: "WARM_UP" | "WORKING";
+      notes: string;
+    }>,
+  ) => {
     if (!selectedDate) return;
 
     const dateString = format(selectedDate, "yyyy-MM-dd");
-    const existingWorkout = workouts.find((w) => w.date === dateString);
+    const newExercise = {
+      exerciseId,
+      exerciseOrder: (selectedWorkout?.workoutExercises.length || 0) + 1,
+      sets: sets.map((set) => ({
+        reps: set.reps,
+        weight: set.weight,
+        setType: set.setType,
+        notes: set.notes || undefined,
+      })),
+    };
 
-    if (existingWorkout) {
-      // Add to existing workout
-      setWorkouts((prev) =>
-        prev.map((workout) => {
-          if (workout.id === existingWorkout.id) {
-            const maxOrder = Math.max(
-              0,
-              ...workout.exercises.map((e) => e.order),
-            );
-            return {
-              ...workout,
-              exercises: [
-                ...workout.exercises,
-                { ...newExercise, order: maxOrder + 1 },
-              ],
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return workout;
-        }),
-      );
-    } else {
-      // Create new workout
-      const newWorkout: Workout = {
-        id: `w-${Date.now()}`,
-        date: dateString,
-        exercises: [{ ...newExercise, order: 1 }],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setWorkouts((prev) => [...prev, newWorkout]);
-    }
+    const workoutData: CreateWorkoutInput = {
+      date: dateString,
+      workoutExercises: selectedWorkout
+        ? [
+            ...selectedWorkout.workoutExercises.map((ex, index) => ({
+              exerciseId: ex.exercise.id,
+              exerciseOrder: index + 1,
+              sets: ex.sets.map((set) => ({
+                reps: set.reps,
+                weight: set.weight,
+                notes: set.notes || undefined,
+                setType: set.setType,
+              })),
+            })),
+            newExercise,
+          ]
+        : [newExercise],
+    };
+
+    createWorkoutMutation.mutate(workoutData);
   };
 
-  const handleUpdateSet = (
-    exerciseId: string,
-    setNumber: number,
-    updatedSet: Partial<ExerciseSet>,
-  ) => {
+  const handleUpdateSet = (exerciseId: string, updatedSets: SetResponse[]) => {
     if (!selectedWorkout) return;
 
-    setWorkouts((prev) =>
-      prev.map((workout) => {
-        if (workout.id === selectedWorkout.id) {
-          return {
-            ...workout,
-            exercises: workout.exercises.map((exercise) => {
-              if (exercise.id === exerciseId) {
-                return {
-                  ...exercise,
-                  sets: exercise.sets.map((set) =>
-                    set.setNumber === setNumber
-                      ? { ...set, ...updatedSet }
-                      : set,
-                  ),
-                };
-              }
-              return exercise;
-            }),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return workout;
-      }),
-    );
+    const workoutData: CreateWorkoutInput = {
+      date: selectedWorkout.date,
+      workoutExercises: selectedWorkout.workoutExercises.map((ex, index) => ({
+        exerciseId: ex.exercise.id,
+        exerciseOrder: index + 1,
+        sets:
+          ex.id === exerciseId
+            ? updatedSets.map((set) => ({
+                reps: set.reps,
+                weight: set.weight,
+                notes: set.notes || undefined,
+                setType: set.setType,
+              }))
+            : ex.sets.map((set) => ({
+                reps: set.reps,
+                weight: set.weight,
+                notes: set.notes || undefined,
+                setType: set.setType,
+              })),
+      })),
+    };
+
+    createWorkoutMutation.mutate(workoutData);
   };
 
   const handleLogout = () => {
-    navigate("/login");
+    logout();
   };
 
   return (
@@ -286,8 +276,10 @@ function WorkoutPage() {
                     </h2>
                     {selectedWorkout && (
                       <p className="text-base text-muted-foreground mt-1">
-                        {selectedWorkout.exercises.length} exercise
-                        {selectedWorkout.exercises.length !== 1 ? "s" : ""}
+                        {selectedWorkout.workoutExercises.length} exercise
+                        {selectedWorkout.workoutExercises.length !== 1
+                          ? "s"
+                          : ""}
                       </p>
                     )}
                   </div>
@@ -316,17 +308,17 @@ function WorkoutPage() {
                 <div className="px-6 pb-6 pt-3">
                   {selectedWorkout ? (
                     <div className="space-y-4">
-                      {selectedWorkout.exercises.map((exercise) => (
+                      {selectedWorkout.workoutExercises.map((exercise) => (
                         <ExerciseCard
                           key={exercise.id}
                           exercise={exercise}
                           isEditing={editingExerciseId === exercise.id}
                           onEdit={() => setEditingExerciseId(exercise.id)}
-                          onSave={() => setEditingExerciseId(null)}
+                          onSave={(updatedSets) => {
+                            handleUpdateSet(exercise.id, updatedSets);
+                            setEditingExerciseId(null);
+                          }}
                           onDelete={() => handleDeleteExercise(exercise.id)}
-                          onUpdateSet={(setNumber, updatedSet) =>
-                            handleUpdateSet(exercise.id, setNumber, updatedSet)
-                          }
                         />
                       ))}
                     </div>
