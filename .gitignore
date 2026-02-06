@@ -17,7 +17,6 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .github/
-.playwright-mcp/
 design-system/
 .idea
 .DS_Store
